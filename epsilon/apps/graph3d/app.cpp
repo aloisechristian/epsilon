@@ -1,0 +1,156 @@
+#include "app.h"
+#include "graph3d_icon.h"
+#include <apps/apps_container.h>
+#include <apps/shared/global_store.h>
+#include <cmath>
+#include <algorithm>
+
+namespace Graph3d {
+
+I18n::Message App::Descriptor::name() const {
+  return I18n::Message::Graph3dApp;
+}
+
+I18n::Message App::Descriptor::upperName() const {
+  return I18n::Message::Graph3dAppCapital;
+}
+
+const Escher::Image * App::Descriptor::icon() const {
+  return ImageStore::Graph3dIcon;
+}
+
+App::Snapshot::Snapshot() : Shared::SharedApp::Snapshot() {
+  strlcpy(m_surfaceExpression, "cos(x)*sin(y)", sizeof(m_surfaceExpression));
+}
+
+App * App::Snapshot::unpack(Escher::Container * container) {
+  return new (container->currentAppBuffer()) App(this);
+}
+
+const App::Descriptor * App::Snapshot::descriptor() const {
+  static Descriptor descriptor;
+  return &descriptor;
+}
+
+void App::Snapshot::reset() {}
+void App::Snapshot::tidy() {}
+
+App::App(Snapshot * snapshot) :
+  Shared::SharedApp(snapshot, &m_mainViewController),
+  m_mainViewController(this, this)
+{
+}
+
+bool App::MainViewController::handleEvent(Ion::Events::Event event) {
+  if (event == Ion::Events::Up) {
+    m_view.setRotation(0, 0.1f);
+    return true;
+  } else if (event == Ion::Events::Down) {
+    m_view.setRotation(0, -0.1f);
+    return true;
+  } else if (event == Ion::Events::Left) {
+    m_view.setRotation(-0.1f, 0);
+    return true;
+  } else if (event == Ion::Events::Right) {
+    m_view.setRotation(0.1f, 0);
+    return true;
+  }
+  return false;
+}
+
+void drawLine(KDContext * ctx, float x0, float y0, float x1, float y1, KDColor c) {
+  int dx = std::round(x1 - x0);
+  int dy = std::round(y1 - y0);
+  int adx = dx < 0 ? -dx : dx;
+  int ady = dy < 0 ? -dy : dy;
+  int steps = adx > ady ? adx : ady;
+  if (steps == 0) {
+    return;
+  }
+  float xInc = dx / (float)steps;
+  float yInc = dy / (float)steps;
+  float x = x0;
+  float y = y0;
+  for (int i = 0; i <= steps; i++) {
+    if (x >= 0 && x < 320 && y >= 0 && y < 240) {
+      ctx->setPixel(KDPoint((int)x, (int)y), c);
+    }
+    x += xInc;
+    y += yInc;
+  }
+}
+
+void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
+  ctx->fillRect(bounds(), KDColorBlack);
+
+  // 3D Rendering parameters
+  int gridSize = 15;
+  float xMin = -5.0f, xMax = 5.0f;
+  float yMin = -5.0f, yMax = 5.0f;
+
+  float dx = (xMax - xMin) / gridSize;
+  float dy = (yMax - yMin) / gridSize;
+
+  // Rotation matrices setup
+  float cosT = std::cos(m_theta);
+  float sinT = std::sin(m_theta);
+  float cosP = std::cos(m_phi);
+  float sinP = std::sin(m_phi);
+
+  auto project = [&](float x, float y, float z, float &px, float &py) {
+    float x1 = x * cosT - y * sinT;
+    float y1 = x * sinT + y * cosT;
+    float z1 = z;
+
+    float y2 = y1 * cosP - z1 * sinP;
+    float z2 = y1 * sinP + z1 * cosP;
+
+    float scale = 25.0f;
+    px = 160.0f + x1 * scale;
+    py = 120.0f - y2 * scale; // Y goes down on screen
+  };
+
+  float zGrid[20][20];
+  for (int i = 0; i <= gridSize; ++i) {
+    for (int j = 0; j <= gridSize; ++j) {
+      float x = xMin + i * dx;
+      float y = yMin + j * dy;
+
+      zGrid[i][j] = std::cos(x) * std::sin(y);
+    }
+  }
+
+  // Draw wireframe grid
+  for (int i = 0; i <= gridSize; ++i) {
+    for (int j = 0; j <= gridSize; ++j) {
+      float px, py;
+      project(xMin + i*dx, yMin + j*dy, zGrid[i][j], px, py);
+
+      if (i < gridSize) {
+        float px_next, py_next;
+        project(xMin + (i+1)*dx, yMin + j*dy, zGrid[i+1][j], px_next, py_next);
+        drawLine(ctx, px, py, px_next, py_next, KDColorWhite);
+      }
+      if (j < gridSize) {
+        float px_next, py_next;
+        project(xMin + i*dx, yMin + (j+1)*dy, zGrid[i][j+1], px_next, py_next);
+        drawLine(ctx, px, py, px_next, py_next, KDColorWhite);
+      }
+    }
+  }
+
+  // Draw axes
+  float ax_x, ax_y;
+  project(0, 0, 0, ax_x, ax_y);
+  float ax_x2, ax_y2;
+  project(5, 0, 0, ax_x2, ax_y2);
+  drawLine(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorRed); // X
+  project(0, 5, 0, ax_x2, ax_y2);
+  drawLine(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorGreen); // Y
+  project(0, 0, 5, ax_x2, ax_y2);
+  drawLine(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorBlue); // Z
+
+  ctx->drawString(m_app->snapshot()->m_surfaceExpression, KDPoint(5, 5), {.glyphColor = KDColorWhite, .backgroundColor = KDColorBlack, .font = KDFont::Size::Large});
+}
+
+}
