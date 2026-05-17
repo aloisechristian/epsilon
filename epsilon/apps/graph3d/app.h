@@ -4,6 +4,8 @@
 #include <escher/app.h>
 #include <escher/view_controller.h>
 #include <escher/view.h>
+#include <escher/input_view_controller.h>
+#include <escher/solid_color_view.h>
 #include <apps/i18n.h>
 #include <apps/shared/shared_app.h>
 
@@ -27,6 +29,8 @@ public:
     void tidy() override;
 
     char m_surfaceExpression[256];
+    float m_zGrid[20][20];
+    bool m_gridNeedsUpdate;
   };
 
   App(Snapshot * snapshot);
@@ -35,6 +39,9 @@ public:
   Snapshot * snapshot() const {
     return static_cast<Snapshot*>(const_cast<Escher::App::Snapshot*>(Escher::App::snapshot()));
   }
+
+  void openMainView();
+  void recalculateGrid();
 
 private:
   class MainView : public Escher::View {
@@ -62,7 +69,36 @@ private:
     MainView m_view;
   };
 
+  class InputController : public Escher::ViewController, public Escher::LayoutFieldDelegate {
+  public:
+    InputController(Escher::Responder * parentResponder, App * app);
+    Escher::View * view() override { return m_inputViewController.view(); }
+    const char * title() const override { return "Input Eq"; }
+    void viewWillAppear() override;
+    void didBecomeFirstResponder() override;
+    bool handleEvent(Ion::Events::Event event) override;
+
+    bool layoutFieldDidReceiveEvent(Escher::LayoutField * layoutField, Ion::Events::Event event) override;
+    bool layoutFieldDidFinishEditing(Escher::LayoutField * layoutField, Ion::Events::Event event) override;
+    void layoutFieldDidAbortEditing(Escher::LayoutField * layoutField) override;
+    void layoutFieldDidChangeSize(Escher::LayoutField * layoutField) override;
+    void updateRepetitionIndexes(Escher::LayoutField* layoutField, Ion::Events::Event event) override {}
+
+  private:
+    App * m_app;
+    class DummyChildController : public Escher::ViewController {
+    public:
+      DummyChildController(Escher::Responder* parent) : ViewController(parent) {}
+      Escher::View* view() override { return &m_view; }
+    private:
+      Escher::SolidColorView m_view{KDColorWhite};
+    };
+    DummyChildController m_dummyChild;
+    Escher::InputViewController m_inputViewController;
+  };
+
   MainViewController m_mainViewController;
+  InputController m_inputController;
 };
 
 }

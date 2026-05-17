@@ -5,7 +5,7 @@ APP_NAME := Epsilon
 APP_VERSION := 25.2.2
 OUTPUT_ROOT := output
 DEBUG ?= 0
-PLATFORM ?= n0120
+PLATFORM ?= host
 STRICT_WARNINGS ?= 0
 
 ALL_SPECIAL_SUBDIRECTORIES := bootloader kernel coverage
