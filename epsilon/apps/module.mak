@@ -32,7 +32,7 @@ $(call depends_on_image,$(PATH_apps)/title_bar_view.cpp,$(PATH_apps)/exam_icon.p
 
 # Include the specific apps
 # FIXME Use flavors instead of EPSILON_APPS?
-EPSILON_APPS ?= calculation graph code statistics distributions inference solver sequence regression elements finance settings
+EPSILON_APPS ?= calculation graph graph3d code statistics distributions inference solver sequence regression elements finance settings
 
 _apps_classes := $(foreach a,$(EPSILON_APPS),$(call capitalize,$a)::App)
 _apps_snapshots_declaration := $(foreach a,$(_apps_classes),$a::Snapshot m_snapshot$(subst :,,$a)Snapshot;)

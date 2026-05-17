@@ -1,9 +1,12 @@
 #include "app.h"
-#include "graph3d_icon.h"
 #include <apps/apps_container.h>
 #include <apps/shared/global_store.h>
+#include <poincare/preferences.h>
+#include <poincare/expression.h>
+#include <poincare/system_expression.h>
+#include <poincare/user_expression.h>
+#include <poincare/pool_variable_context.h>
 #include <cmath>
-#include <algorithm>
 
 namespace Graph3d {
 
@@ -16,7 +19,7 @@ I18n::Message App::Descriptor::upperName() const {
 }
 
 const Escher::Image * App::Descriptor::icon() const {
-  return ImageStore::Graph3dIcon;
+  return nullptr;
 }
 
 App::Snapshot::Snapshot() : Shared::SharedApp::Snapshot() {
@@ -83,6 +86,15 @@ void drawLine(KDContext * ctx, float x0, float y0, float x1, float y1, KDColor c
 void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
   ctx->fillRect(bounds(), KDColorBlack);
 
+  const Poincare::SymbolContext & globalContext = Shared::GlobalContextAccessor::Context();
+
+  Poincare::UserExpression e = Poincare::UserExpression::Parse(m_app->snapshot()->m_surfaceExpression, globalContext);
+
+  if (e.isUninitialized()) {
+    ctx->drawString("Invalid expression", KDPoint(10, 10), {.glyphColor = KDColorRed, .backgroundColor = KDColorBlack, .font = KDFont::Size::Large});
+    return;
+  }
+
   // 3D Rendering parameters
   int gridSize = 15;
   float xMin = -5.0f, xMax = 5.0f;
@@ -103,7 +115,6 @@ void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
     float z1 = z;
 
     float y2 = y1 * cosP - z1 * sinP;
-    float z2 = y1 * sinP + z1 * cosP;
 
     float scale = 25.0f;
     px = 160.0f + x1 * scale;
