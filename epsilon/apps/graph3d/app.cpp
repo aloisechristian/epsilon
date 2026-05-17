@@ -1,6 +1,8 @@
 #include "app.h"
+#include <apps/graph/graph_icon.h>
 #include <apps/apps_container.h>
 #include <apps/shared/global_store.h>
+#include <apps/global_preferences.h>
 #include <poincare/preferences.h>
 #include <poincare/expression.h>
 #include <poincare/system_expression.h>
@@ -19,7 +21,7 @@ I18n::Message App::Descriptor::upperName() const {
 }
 
 const Escher::Image * App::Descriptor::icon() const {
-  return nullptr;
+  return ImageStore::GraphIcon;
 }
 
 App::Snapshot::Snapshot() : Shared::SharedApp::Snapshot() {
@@ -122,12 +124,21 @@ void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
   };
 
   float zGrid[20][20];
+  Poincare::AngleUnit angleUnit = GlobalPreferences::SharedGlobalPreferences()->angleUnit();
+  Poincare::ComplexFormat complexFormat = GlobalPreferences::SharedGlobalPreferences()->complexFormat();
+
   for (int i = 0; i <= gridSize; ++i) {
     for (int j = 0; j <= gridSize; ++j) {
       float x = xMin + i * dx;
       float y = yMin + j * dy;
 
-      zGrid[i][j] = std::cos(x) * std::sin(y);
+      Poincare::UserExpression expY = Poincare::UserExpression::Builder(Poincare::SystemExpression::DecimalBuilderFromDouble(y).tree());
+      Poincare::UserExpression expX = Poincare::UserExpression::Builder(Poincare::SystemExpression::DecimalBuilderFromDouble(x).tree());
+
+      Poincare::PoolVariableContext ctxY("y", expY, &globalContext);
+      Poincare::PoolVariableContext ctxX("x", expX, &ctxY);
+
+      zGrid[i][j] = e.approximateToRealScalar<float>(angleUnit, complexFormat, ctxX);
     }
   }
 
