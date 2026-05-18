@@ -75,7 +75,7 @@ private:
     Escher::View * view() override { return m_inputViewController.view(); }
     const char * title() const override { return "Input Eq"; }
     void viewWillAppear() override;
-    void didBecomeFirstResponder() override;
+    void didBecomeFirstResponder();
     bool handleEvent(Ion::Events::Event event) override;
 
     bool layoutFieldDidReceiveEvent(Escher::LayoutField * layoutField, Ion::Events::Event event) override;
