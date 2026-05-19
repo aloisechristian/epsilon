@@ -10,6 +10,7 @@
 #include <poincare/pool_variable_context.h>
 #include <poincare/layout.h>
 #include <cmath>
+#include <stdio.h>
 
 namespace Graph3d {
 
@@ -115,15 +116,10 @@ void App::recalculateGrid() {
         float x = xMin + i * dx;
         float y = yMin + j * dy;
 
-        // Instead of serializing floats back to strings, use Context builder from floats/doubles directly
-        Poincare::UserExpression xExpr = Poincare::UserExpression::Parse(Poincare::NumberBuilder::Builder(x).isUninitialized() ? "0" : "", globalContext);
-        Poincare::UserExpression yExpr = Poincare::UserExpression::Parse(Poincare::NumberBuilder::Builder(y).isUninitialized() ? "0" : "", globalContext);
-
-        // Fallback safely since the previous parsing logic crashed, and PoolVariableContext requires UserExpression
         char bufferX[32];
         char bufferY[32];
-        std::snprintf(bufferX, sizeof(bufferX), "%f", x);
-        std::snprintf(bufferY, sizeof(bufferY), "%f", y);
+        snprintf(bufferX, sizeof(bufferX), "%f", (double)x);
+        snprintf(bufferY, sizeof(bufferY), "%f", (double)y);
 
         Poincare::UserExpression xExprFromStr = Poincare::UserExpression::Parse(bufferX, globalContext);
         Poincare::UserExpression yExprFromStr = Poincare::UserExpression::Parse(bufferY, globalContext);
