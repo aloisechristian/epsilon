@@ -9,6 +9,7 @@
 #include <poincare/user_expression.h>
 #include <poincare/pool_variable_context.h>
 #include <poincare/layout.h>
+#include <poincare/number_builder.h>
 #include <cmath>
 
 namespace Graph3d {
@@ -115,16 +116,21 @@ void App::recalculateGrid() {
         float x = xMin + i * dx;
         float y = yMin + j * dy;
 
+        // Instead of serializing floats back to strings, use Context builder from floats/doubles directly
+        Poincare::UserExpression xExpr = Poincare::UserExpression::Parse(Poincare::NumberBuilder::Builder(x).isUninitialized() ? "0" : "", globalContext);
+        Poincare::UserExpression yExpr = Poincare::UserExpression::Parse(Poincare::NumberBuilder::Builder(y).isUninitialized() ? "0" : "", globalContext);
+
+        // Fallback safely since the previous parsing logic crashed, and PoolVariableContext requires UserExpression
         char bufferX[32];
         char bufferY[32];
-        Poincare::SystemExpression::DecimalBuilderFromDouble(x).serialize(bufferX);
-        Poincare::SystemExpression::DecimalBuilderFromDouble(y).serialize(bufferY);
+        std::snprintf(bufferX, sizeof(bufferX), "%f", x);
+        std::snprintf(bufferY, sizeof(bufferY), "%f", y);
 
-        Poincare::UserExpression xExpr = Poincare::UserExpression::Parse(bufferX, globalContext);
-        Poincare::UserExpression yExpr = Poincare::UserExpression::Parse(bufferY, globalContext);
+        Poincare::UserExpression xExprFromStr = Poincare::UserExpression::Parse(bufferX, globalContext);
+        Poincare::UserExpression yExprFromStr = Poincare::UserExpression::Parse(bufferY, globalContext);
 
-        Poincare::PoolVariableContext context1("x", xExpr, &globalContext);
-        Poincare::PoolVariableContext context2("y", yExpr, &context1);
+        Poincare::PoolVariableContext context1("x", xExprFromStr, &globalContext);
+        Poincare::PoolVariableContext context2("y", yExprFromStr, &context1);
 
         float z = e.approximateToRealScalar<float>(angleUnit, complexFormat, context2);
         snapshot()->m_zGrid[i][j] = z;
