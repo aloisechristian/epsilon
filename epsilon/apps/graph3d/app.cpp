@@ -9,7 +9,6 @@
 #include <poincare/user_expression.h>
 #include <poincare/pool_variable_context.h>
 #include <poincare/layout.h>
-#include <poincare/number_builder.h>
 #include <cmath>
 
 namespace Graph3d {
