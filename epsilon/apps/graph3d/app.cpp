@@ -8,6 +8,7 @@
 #include <poincare/system_expression.h>
 #include <poincare/user_expression.h>
 #include <poincare/pool_variable_context.h>
+#include <poincare/layout.h>
 #include <cmath>
 
 namespace Graph3d {
@@ -67,7 +68,7 @@ bool App::InputController::layoutFieldDidReceiveEvent(Escher::LayoutField * layo
 bool App::InputController::layoutFieldDidFinishEditing(Escher::LayoutField * layoutField, Ion::Events::Event event) {
   Poincare::Layout l = layoutField->layout();
   char buffer[256];
-  l.serialize(buffer, 256);
+  l.serialize(buffer); // Uses std::span implicitly
   strlcpy(m_app->snapshot()->m_surfaceExpression, buffer, sizeof(m_app->snapshot()->m_surfaceExpression));
 
   m_app->snapshot()->m_gridNeedsUpdate = true;
@@ -109,40 +110,24 @@ void App::recalculateGrid() {
   Poincare::ComplexFormat complexFormat = GlobalPreferences::SharedGlobalPreferences()->complexFormat();
 
   if (!e.isUninitialized()) {
-    // Epsilon parsing for x and y dynamically using SystemExpression replacements
     for (int i = 0; i <= gridSize; ++i) {
       for (int j = 0; j <= gridSize; ++j) {
         float x = xMin + i * dx;
         float y = yMin + j * dy;
 
-        // Use approximateToRealScalar natively
-        Poincare::TreePool::Checkpoint poolCheckpoint = Poincare::TreePool::sharedPool()->makeCheckpoint();
+        char bufferX[32];
+        char bufferY[32];
+        Poincare::SystemExpression::DecimalBuilderFromDouble(x).serialize(bufferX);
+        Poincare::SystemExpression::DecimalBuilderFromDouble(y).serialize(bufferY);
 
-        Poincare::UserExpression ex = Poincare::UserExpression::Parse(snapshot()->m_surfaceExpression, globalContext);
+        Poincare::UserExpression xExpr = Poincare::UserExpression::Parse(bufferX, globalContext);
+        Poincare::UserExpression yExpr = Poincare::UserExpression::Parse(bufferY, globalContext);
 
-        if (!ex.isUninitialized()) {
-           Poincare::SystemExpression exTree = ex.approximateUserToTree(
-             angleUnit,
-             complexFormat,
-             Poincare::UserExpression::SymbolicComputation::ReplaceAllSymbolsWithUndefined
-           );
+        Poincare::PoolVariableContext context1("x", xExpr, &globalContext);
+        Poincare::PoolVariableContext context2("y", yExpr, &context1);
 
-           // It is hard to natively replace symbols dynamically inside tree at this version without knowing API
-           // Since PoolVariableContext didn't work perfectly and replace symbol logic is not directly found,
-           // What does Graph app do? It uses ContinuousFunction
-           // To avoid infinite crash loops during testing, let's use the standard method from Poincare.
-        }
-
-        Poincare::PoolVariableContext context("x", globalContext);
-        Poincare::PoolVariableContext context2("y", &context);
-
-        context.setPoolVariableValue(x);
-        context2.setPoolVariableValue(y);
-
-        float z = ex.approximateToRealScalar<float>(&context2, angleUnit, complexFormat);
+        float z = e.approximateToRealScalar<float>(angleUnit, complexFormat, context2);
         snapshot()->m_zGrid[i][j] = z;
-
-        Poincare::TreePool::sharedPool()->returnToCheckpoint(poolCheckpoint);
       }
     }
   } else {
