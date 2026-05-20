@@ -10,7 +10,7 @@
 #include <poincare/pool_variable_context.h>
 #include <poincare/layout.h>
 #include <cmath>
-#include <stdio.h>
+#include <cstdio>
 
 namespace Graph3d {
 
