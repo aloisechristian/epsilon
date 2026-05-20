@@ -9,8 +9,8 @@
 #include <poincare/user_expression.h>
 #include <poincare/pool_variable_context.h>
 #include <poincare/layout.h>
+#include <poincare/print.h>
 #include <cmath>
-#include <cstdio>
 
 namespace Graph3d {
 
@@ -118,8 +118,8 @@ void App::recalculateGrid() {
 
         char bufferX[32];
         char bufferY[32];
-        snprintf(bufferX, sizeof(bufferX), "%f", (double)x);
-        snprintf(bufferY, sizeof(bufferY), "%f", (double)y);
+        Poincare::Print::CustomPrintf(bufferX, sizeof(bufferX), "%*.*ef", x, Poincare::Preferences::PrintFloatMode::Decimal, 7);
+        Poincare::Print::CustomPrintf(bufferY, sizeof(bufferY), "%*.*ef", y, Poincare::Preferences::PrintFloatMode::Decimal, 7);
 
         Poincare::UserExpression xExprFromStr = Poincare::UserExpression::Parse(bufferX, globalContext);
         Poincare::UserExpression yExprFromStr = Poincare::UserExpression::Parse(bufferY, globalContext);
