@@ -23,7 +23,10 @@ I18n::Message App::Descriptor::upperName() const {
 }
 
 const Escher::Image * App::Descriptor::icon() const {
-  return ImageStore::Graph3dIcon;
+  // Use GraphIcon for now to fix linking issue, since Epsilon build system
+  // might not be automatically hooking up image generation for graph3d_icon.png
+  // into the ImageStore despite depends_on_image being set.
+  return ImageStore::GraphIcon;
 }
 
 App::Snapshot::Snapshot() : Shared::SharedApp::Snapshot(), m_gridNeedsUpdate(true) {
