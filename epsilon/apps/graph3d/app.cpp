@@ -1,5 +1,6 @@
 #include "app.h"
 #include "apps/graph3d/graph3d_icon.h"
+#include "apps/graph/graph_icon.h"
 #include <apps/apps_container.h>
 #include <apps/shared/global_store.h>
 #include <apps/global_preferences.h>
