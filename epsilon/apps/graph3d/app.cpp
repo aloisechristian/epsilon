@@ -24,9 +24,6 @@ I18n::Message App::Descriptor::upperName() const {
 }
 
 const Escher::Image * App::Descriptor::icon() const {
-  // Use GraphIcon for now to fix linking issue, since Epsilon build system
-  // might not be automatically hooking up image generation for graph3d_icon.png
-  // into the ImageStore despite depends_on_image being set.
   return ImageStore::GraphIcon;
 }
 
@@ -51,19 +48,21 @@ void App::Snapshot::tidy() {}
 App::InputController::InputController(Escher::Responder * parentResponder, App * app) :
   ViewController(parentResponder),
   m_app(app),
-  m_dummyChild(this),
-  m_inputViewController(this, &m_dummyChild, this) {}
+  m_contentView(this, this) {}
 
-void App::InputController::viewWillAppear() {
-  m_inputViewController.viewWillAppear();
-}
+void App::InputController::handleResponderChainEvent(ResponderChainEvent event) {
+  if (event.type == ResponderChainEventType::HasBecomeFirst) {
+    App::app()->setFirstResponder(m_contentView.layoutField());
+    m_contentView.layoutField()->setEditing(true);
 
-void App::InputController::didBecomeFirstResponder() {
-  App::app()->setFirstResponder(&m_inputViewController);
-}
-
-bool App::InputController::handleEvent(Ion::Events::Event event) {
-  return false;
+    // Set initial text
+    Poincare::Layout l = Poincare::UserExpression::Parse(m_app->snapshot()->m_surfaceExpression, Shared::GlobalContextAccessor::Context()).createLayout(Poincare::Preferences::PrintFloatMode::Decimal, 7, Shared::GlobalContextAccessor::Context());
+    if (!l.isUninitialized()) {
+      m_contentView.layoutField()->setLayout(l);
+    }
+  } else {
+    ViewController::handleResponderChainEvent(event);
+  }
 }
 
 bool App::InputController::layoutFieldDidReceiveEvent(Escher::LayoutField * layoutField, Ion::Events::Event event) {
@@ -73,22 +72,23 @@ bool App::InputController::layoutFieldDidReceiveEvent(Escher::LayoutField * layo
 bool App::InputController::layoutFieldDidFinishEditing(Escher::LayoutField * layoutField, Ion::Events::Event event) {
   Poincare::Layout l = layoutField->layout();
   char buffer[256];
-  l.serialize(buffer); // Uses std::span implicitly
+  l.serialize(buffer);
   strlcpy(m_app->snapshot()->m_surfaceExpression, buffer, sizeof(m_app->snapshot()->m_surfaceExpression));
 
   m_app->snapshot()->m_gridNeedsUpdate = true;
-  m_app->recalculateGrid();
   m_app->openMainView();
   return true;
 }
 
 void App::InputController::layoutFieldDidAbortEditing(Escher::LayoutField * layoutField) {}
 
-void App::InputController::layoutFieldDidChangeSize(Escher::LayoutField * layoutField) {}
-
+void App::InputController::layoutFieldDidChangeSize(Escher::LayoutField * layoutField) {
+  m_contentView.layoutSubviews(true);
+  m_contentView.markWholeFrameAsDirty();
+}
 
 App::App(Snapshot * snapshot) :
-  Shared::SharedApp(snapshot, &m_inputController), // start with input controller
+  Shared::SharedApp(snapshot, &m_inputController),
   m_mainViewController(this, this),
   m_inputController(this, this)
 {

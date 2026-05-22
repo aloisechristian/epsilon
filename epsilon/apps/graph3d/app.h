@@ -4,7 +4,8 @@
 #include <escher/app.h>
 #include <escher/view_controller.h>
 #include <escher/view.h>
-#include <escher/input_view_controller.h>
+#include <escher/text_field_delegate.h>
+#include <escher/expression_input_bar.h>
 #include <escher/solid_color_view.h>
 #include <apps/i18n.h>
 #include <apps/shared/shared_app.h>
@@ -72,29 +73,41 @@ private:
   class InputController : public Escher::ViewController, public Escher::LayoutFieldDelegate {
   public:
     InputController(Escher::Responder * parentResponder, App * app);
-    Escher::View * view() override { return m_inputViewController.view(); }
+    Escher::View * view() override { return &m_contentView; }
     const char * title() const override { return "Input Eq"; }
-    void viewWillAppear() override;
-    void didBecomeFirstResponder();
-    bool handleEvent(Ion::Events::Event event) override;
 
     bool layoutFieldDidReceiveEvent(Escher::LayoutField * layoutField, Ion::Events::Event event) override;
     bool layoutFieldDidFinishEditing(Escher::LayoutField * layoutField, Ion::Events::Event event) override;
     void layoutFieldDidAbortEditing(Escher::LayoutField * layoutField) override;
     void layoutFieldDidChangeSize(Escher::LayoutField * layoutField) override;
-    void updateRepetitionIndexes(Escher::LayoutField* layoutField, Ion::Events::Event event) override {}
+
+  protected:
+    void handleResponderChainEvent(ResponderChainEvent event) override;
 
   private:
     App * m_app;
-    class DummyChildController : public Escher::ViewController {
+    class ContentView : public Escher::View {
     public:
-      DummyChildController(Escher::Responder* parent) : ViewController(parent) {}
-      Escher::View* view() override { return &m_view; }
+      ContentView(Escher::Responder* parentResponder, Escher::LayoutFieldDelegate* layoutFieldDelegate)
+          : m_expressionInputBar(parentResponder, layoutFieldDelegate) {}
+
+      Escher::LayoutField* layoutField() { return m_expressionInputBar.layoutField(); }
+
     private:
-      Escher::SolidColorView m_view{KDColorWhite};
+      int numberOfSubviews() const override { return 2; }
+      Escher::View* subviewAtIndex(int index) override {
+        if (index == 0) return &m_solidView;
+        return &m_expressionInputBar;
+      }
+      void layoutSubviews(bool force = false) override {
+        KDCoordinate inputHeight = m_expressionInputBar.minimalSizeForOptimalDisplay().height();
+        setChildFrame(&m_solidView, KDRect(0, 0, bounds().width(), bounds().height() - inputHeight), force);
+        setChildFrame(&m_expressionInputBar, KDRect(0, bounds().height() - inputHeight, bounds().width(), inputHeight), force);
+      }
+      Escher::SolidColorView m_solidView{KDColorWhite};
+      Escher::ExpressionInputBar m_expressionInputBar;
     };
-    DummyChildController m_dummyChild;
-    Escher::InputViewController m_inputViewController;
+    ContentView m_contentView;
   };
 
   MainViewController m_mainViewController;
