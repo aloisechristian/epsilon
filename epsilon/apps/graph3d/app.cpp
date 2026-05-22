@@ -83,8 +83,7 @@ bool App::InputController::layoutFieldDidFinishEditing(Escher::LayoutField * lay
 void App::InputController::layoutFieldDidAbortEditing(Escher::LayoutField * layoutField) {}
 
 void App::InputController::layoutFieldDidChangeSize(Escher::LayoutField * layoutField) {
-  m_contentView.layoutSubviews(true);
-  m_contentView.markWholeFrameAsDirty();
+  m_contentView.reload();
 }
 
 App::App(Snapshot * snapshot) :

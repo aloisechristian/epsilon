@@ -92,6 +92,10 @@ private:
           : m_expressionInputBar(parentResponder, layoutFieldDelegate) {}
 
       Escher::LayoutField* layoutField() { return m_expressionInputBar.layoutField(); }
+      void reload() {
+        layoutSubviews(true);
+        markWholeFrameAsDirty();
+      }
 
     private:
       int numberOfSubviews() const override { return 2; }
