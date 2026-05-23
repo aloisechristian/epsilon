@@ -172,9 +172,9 @@ void drawLineWithOcclusion(KDContext * ctx, float x0f, float y0f, float x1f, flo
   int x1 = std::round(x1f);
   int y1 = std::round(y1f);
 
-  int dx = std::abs(x1 - x0);
+  int dx = x1 > x0 ? x1 - x0 : x0 - x1;
   int sx = x0 < x1 ? 1 : -1;
-  int dy = -std::abs(y1 - y0);
+  int dy = -(y1 > y0 ? y1 - y0 : y0 - y1);
   int sy = y0 < y1 ? 1 : -1;
   int err = dx + dy, e2;
 
