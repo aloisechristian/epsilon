@@ -166,30 +166,48 @@ bool App::MainViewController::handleEvent(Ion::Events::Event event) {
   return false;
 }
 
-void drawLine(KDContext * ctx, float x0, float y0, float x1, float y1, KDColor c) {
-  int dx = std::round(x1 - x0);
-  int dy = std::round(y1 - y0);
-  int adx = dx < 0 ? -dx : dx;
-  int ady = dy < 0 ? -dy : dy;
-  int steps = adx > ady ? adx : ady;
-  if (steps == 0) {
-    return;
-  }
-  float xInc = dx / (float)steps;
-  float yInc = dy / (float)steps;
-  float x = x0;
-  float y = y0;
-  for (int i = 0; i <= steps; i++) {
-    if (x >= 0 && x < 320 && y >= 0 && y < 240) {
-      ctx->setPixel(KDPoint((int)x, (int)y), c);
+void drawLineWithOcclusion(KDContext * ctx, float x0f, float y0f, float x1f, float y1f, KDColor c, int* yMinBuffer, int* yMaxBuffer) {
+  int x0 = std::round(x0f);
+  int y0 = std::round(y0f);
+  int x1 = std::round(x1f);
+  int y1 = std::round(y1f);
+
+  int dx = std::abs(x1 - x0);
+  int sx = x0 < x1 ? 1 : -1;
+  int dy = -std::abs(y1 - y0);
+  int sy = y0 < y1 ? 1 : -1;
+  int err = dx + dy, e2;
+
+  while (true) {
+    if (x0 >= 0 && x0 < 320 && y0 >= 0 && y0 < 240) {
+      if (y0 <= yMinBuffer[x0] || y0 >= yMaxBuffer[x0]) {
+        ctx->setPixel(KDPoint(x0, y0), c);
+        if (y0 < yMinBuffer[x0]) yMinBuffer[x0] = y0;
+        if (y0 > yMaxBuffer[x0]) yMaxBuffer[x0] = y0;
+      }
     }
-    x += xInc;
-    y += yInc;
+    if (x0 == x1 && y0 == y1) break;
+    e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x0 += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y0 += sy;
+    }
   }
 }
 
 void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
   ctx->fillRect(bounds(), KDColorBlack);
+
+  int yMinBuffer[320];
+  int yMaxBuffer[320];
+  for (int i = 0; i < 320; ++i) {
+    yMinBuffer[i] = 240; // Max possible screen Y + 1
+    yMaxBuffer[i] = -1;  // Min possible screen Y - 1
+  }
 
   int gridSize = 15;
   float xMin = -5.0f, xMax = 5.0f;
@@ -215,23 +233,51 @@ void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
     py = 120.0f - y2 * scale; // Y goes down on screen
   };
 
-  // Draw wireframe grid
+  // Pre-calculate all screen coordinates to avoid redundant matrix multiplications
+  float projX[16][16];
+  float projY[16][16];
+
   for (int i = 0; i <= gridSize; ++i) {
     for (int j = 0; j <= gridSize; ++j) {
+      if (!std::isnan(m_app->snapshot()->m_zGrid[i][j])) {
+        project(xMin + i*dx, yMin + j*dy, m_app->snapshot()->m_zGrid[i][j], projX[i][j], projY[i][j]);
+      }
+    }
+  }
+
+  // Draw wireframe grid front-to-back based on depth (Y in viewing coordinates after first rotation)
+  // Simple heuristic for front-to-back: Iterate y from min to max, or max to min depending on viewing angle
+  int jStart, jEnd, jStep;
+  if (sinT > 0) {
+      jStart = gridSize; jEnd = -1; jStep = -1;
+  } else {
+      jStart = 0; jEnd = gridSize + 1; jStep = 1;
+  }
+
+  int iStart, iEnd, iStep;
+  if (cosT > 0) {
+      iStart = 0; iEnd = gridSize + 1; iStep = 1;
+  } else {
+      iStart = gridSize; iEnd = -1; iStep = -1;
+  }
+
+  for (int j = jStart; j != jEnd; j += jStep) {
+    for (int i = iStart; i != iEnd; i += iStep) {
       if (std::isnan(m_app->snapshot()->m_zGrid[i][j])) continue;
 
-      float px, py;
-      project(xMin + i*dx, yMin + j*dy, m_app->snapshot()->m_zGrid[i][j], px, py);
+      float px = projX[i][j];
+      float py = projY[i][j];
 
-      if (i < gridSize && !std::isnan(m_app->snapshot()->m_zGrid[i+1][j])) {
-        float px_next, py_next;
-        project(xMin + (i+1)*dx, yMin + j*dy, m_app->snapshot()->m_zGrid[i+1][j], px_next, py_next);
-        drawLine(ctx, px, py, px_next, py_next, KDColorWhite);
+      // Draw line to the next i point
+      int iNext = i + iStep;
+      if (iNext >= 0 && iNext <= gridSize && !std::isnan(m_app->snapshot()->m_zGrid[iNext][j])) {
+        drawLineWithOcclusion(ctx, px, py, projX[iNext][j], projY[iNext][j], KDColorWhite, yMinBuffer, yMaxBuffer);
       }
-      if (j < gridSize && !std::isnan(m_app->snapshot()->m_zGrid[i][j+1])) {
-        float px_next, py_next;
-        project(xMin + i*dx, yMin + (j+1)*dy, m_app->snapshot()->m_zGrid[i][j+1], px_next, py_next);
-        drawLine(ctx, px, py, px_next, py_next, KDColorWhite);
+
+      // Draw line to the next j point
+      int jNext = j + jStep;
+      if (jNext >= 0 && jNext <= gridSize && !std::isnan(m_app->snapshot()->m_zGrid[i][jNext])) {
+        drawLineWithOcclusion(ctx, px, py, projX[i][jNext], projY[i][jNext], KDColorWhite, yMinBuffer, yMaxBuffer);
       }
     }
   }
@@ -240,12 +286,15 @@ void App::MainView::drawRect(KDContext * ctx, KDRect rect) const {
   float ax_x, ax_y;
   project(0, 0, 0, ax_x, ax_y);
   float ax_x2, ax_y2;
+
   project(5, 0, 0, ax_x2, ax_y2);
-  drawLine(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorRed); // X
+  drawLineWithOcclusion(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorRed, yMinBuffer, yMaxBuffer); // X
+
   project(0, 5, 0, ax_x2, ax_y2);
-  drawLine(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorGreen); // Y
+  drawLineWithOcclusion(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorGreen, yMinBuffer, yMaxBuffer); // Y
+
   project(0, 0, 5, ax_x2, ax_y2);
-  drawLine(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorBlue); // Z
+  drawLineWithOcclusion(ctx, ax_x, ax_y, ax_x2, ax_y2, KDColorBlue, yMinBuffer, yMaxBuffer); // Z
 
   ctx->drawString(m_app->snapshot()->m_surfaceExpression, KDPoint(5, 5), {.glyphColor = KDColorWhite, .backgroundColor = KDColorBlack, .font = KDFont::Size::Large});
 }
